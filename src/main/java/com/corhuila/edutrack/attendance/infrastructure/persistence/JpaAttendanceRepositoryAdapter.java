@@ -1,6 +1,7 @@
 package com.corhuila.edutrack.attendance.infrastructure.persistence;
 
 import com.corhuila.edutrack.attendance.domain.model.AttendanceEvent;
+import com.corhuila.edutrack.attendance.domain.model.AttendanceStatus;
 import com.corhuila.edutrack.attendance.domain.port.out.AttendanceRepositoryPort;
 import org.springframework.stereotype.Component;
 
@@ -25,7 +26,7 @@ public class JpaAttendanceRepositoryAdapter implements AttendanceRepositoryPort 
             event.getStudentId(),
             event.getSchoolId(),
             event.getDate(),
-            event.getStatus(),
+            event.getStatus().name(), // enum de dominio -> columna String en BD
             event.getTeacherId(),
             event.getSequenceNum(),
             event.getRecordedAt()
@@ -59,7 +60,7 @@ public class JpaAttendanceRepositoryAdapter implements AttendanceRepositoryPort 
             entity.getStudentId(),
             entity.getSchoolId(),
             entity.getDate(),
-            entity.getStatus(),
+            AttendanceStatus.fromString(entity.getStatus()), // columna String en BD -> enum de dominio
             entity.getTeacherId(),
             entity.getSequenceNum(),
             entity.getRecordedAt()

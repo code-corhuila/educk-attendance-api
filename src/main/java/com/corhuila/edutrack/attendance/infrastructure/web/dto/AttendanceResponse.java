@@ -32,7 +32,7 @@ public class AttendanceResponse {
             event.getStudentId(),
             event.getSchoolId(),
             event.getDate(),
-            event.getStatus(),
+            event.getStatus().name(), // el DTO de salida sigue exponiendo el estado como String
             event.getTeacherId(),
             event.getSequenceNum(),
             event.getRecordedAt()

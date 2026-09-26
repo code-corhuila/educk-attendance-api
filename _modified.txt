@@ -1,0 +1,8 @@
+src/main/java/com/corhuila/edutrack/attendance/application/service/AttendanceService.java
+src/main/java/com/corhuila/edutrack/attendance/domain/exception/InvalidAttendanceDateException.java
+src/main/java/com/corhuila/edutrack/attendance/domain/model/AttendanceEvent.java
+src/main/java/com/corhuila/edutrack/attendance/domain/model/AttendanceStatus.java
+src/main/java/com/corhuila/edutrack/attendance/infrastructure/persistence/JpaAttendanceRepositoryAdapter.java
+src/main/java/com/corhuila/edutrack/attendance/infrastructure/web/dto/AttendanceResponse.java
+src/test/java/com/corhuila/edutrack/attendance/application/service/AttendanceServiceTest.java
+src/test/java/com/corhuila/edutrack/attendance/domain/model/AttendanceStatusTest.java

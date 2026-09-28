@@ -27,7 +27,7 @@ import java.util.UUID;
  * la demarcación transaccional, no para la lógica de negocio en sí.
  *
  * SOLID:
- * - SRP: únicamente orquesta el caso de uso de asistencia (valida invariantes,
+ * - SRP: únicamente orquesta el caso de uso de asistencia (valida invariants,
  *   delega persistencia y publicación de eventos a sus puertos).
  * - DIP: depende de abstracciones (AttendanceRepositoryPort,
  *   AttendanceEventPublisherPort), no de implementaciones concretas.

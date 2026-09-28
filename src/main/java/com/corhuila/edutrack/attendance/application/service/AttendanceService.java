@@ -115,4 +115,5 @@ public class AttendanceService implements RegisterAttendanceUseCase, GetAttendan
         StudentAbsentEvent domainEvent = new StudentAbsentEvent(saved.getId().toString(), payload);
         eventPublisherPort.publishStudentAbsent(domainEvent);
     }
+    // Added comment for PR validation flow
 }

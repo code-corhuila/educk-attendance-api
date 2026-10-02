@@ -1,19 +1,5 @@
 package com.corhuila.edutrack.attendance.application.service;
 
-import com.corhuila.edutrack.attendance.domain.exception.InvalidAttendanceDateException;
-import com.corhuila.edutrack.attendance.domain.exception.InvalidAttendanceException;
-import com.corhuila.edutrack.attendance.domain.model.AttendanceEvent;
-import com.corhuila.edutrack.attendance.domain.model.AttendanceStatus;
-import com.corhuila.edutrack.attendance.domain.model.StudentAbsentEvent;
-import com.corhuila.edutrack.attendance.domain.port.out.AttendanceEventPublisherPort;
-import com.corhuila.edutrack.attendance.domain.port.out.AttendanceRepositoryPort;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -21,11 +7,26 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import static org.mockito.ArgumentMatchers.any;
+import org.mockito.Mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import com.corhuila.edutrack.attendance.domain.exception.InvalidAttendanceDateException;
+import com.corhuila.edutrack.attendance.domain.exception.InvalidAttendanceException;
+import com.corhuila.edutrack.attendance.domain.model.AttendanceEvent;
+import com.corhuila.edutrack.attendance.domain.model.AttendanceStatus;
+import com.corhuila.edutrack.attendance.domain.model.StudentAbsentEvent;
+import com.corhuila.edutrack.attendance.domain.port.out.AttendanceOutboxPort;
+import com.corhuila.edutrack.attendance.domain.port.out.AttendanceRepositoryPort;
+import com.corhuila.edutrack.attendance.domain.port.out.LamportClockPort;
 
 /**
  * Unit tests for AttendanceService. No Spring context is loaded:
@@ -39,7 +40,10 @@ class AttendanceServiceTest {
     private AttendanceRepositoryPort repositoryPort;
 
     @Mock
-    private AttendanceEventPublisherPort eventPublisherPort;
+    private AttendanceOutboxPort outboxPort;
+
+    @Mock
+    private LamportClockPort lamportClockPort;
 
     private AttendanceService attendanceService;
 
@@ -49,14 +53,14 @@ class AttendanceServiceTest {
 
     @BeforeEach
     void setUp() {
-        attendanceService = new AttendanceService(repositoryPort, eventPublisherPort);
+        attendanceService = new AttendanceService(repositoryPort, outboxPort, lamportClockPort);
         studentId = UUID.randomUUID();
         schoolId = UUID.randomUUID();
         teacherId = UUID.randomUUID();
     }
 
     @Test
-    void registerAttendance_withPresentStatus_savesAndDoesNotPublishEvent() {
+    void registerAttendance_withPresentStatus_savesAndDoesNotTouchOutbox() {
         when(repositoryPort.save(any(AttendanceEvent.class))).thenAnswer(inv -> inv.getArgument(0));
 
         AttendanceEvent result = attendanceService.registerAttendance(
@@ -64,12 +68,13 @@ class AttendanceServiceTest {
 
         assertThat(result.getStatus()).isEqualTo(AttendanceStatus.PRESENT);
         verify(repositoryPort, times(1)).save(any(AttendanceEvent.class));
-        verifyNoInteractions(eventPublisherPort);
+        verifyNoInteractions(outboxPort, lamportClockPort);
     }
 
     @Test
-    void registerAttendance_withAbsentStatus_publishesStudentAbsentEvent() {
+    void registerAttendance_withAbsentStatus_appendsStudentAbsentWithLamportToOutbox() {
         when(repositoryPort.save(any(AttendanceEvent.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(lamportClockPort.tick(2L)).thenReturn(7L);
 
         AttendanceEvent result = attendanceService.registerAttendance(
             studentId, schoolId, LocalDate.now(), "absent", teacherId, 2L);
@@ -77,19 +82,20 @@ class AttendanceServiceTest {
         assertThat(result.getStatus()).isEqualTo(AttendanceStatus.ABSENT);
 
         ArgumentCaptor<StudentAbsentEvent> captor = ArgumentCaptor.forClass(StudentAbsentEvent.class);
-        verify(eventPublisherPort, times(1)).publishStudentAbsent(captor.capture());
+        verify(outboxPort, times(1)).append(captor.capture());
         assertThat(captor.getValue().getPayload().getStudentId()).isEqualTo(studentId.toString());
         assertThat(captor.getValue().getPayload().getStatus()).isEqualTo("ABSENT");
+        assertThat(captor.getValue().getPayload().getLamportTimestamp()).isEqualTo(7L);
     }
 
     @Test
-    void registerAttendance_withNonAbsentStatus_neverPublishesEvent() {
+    void registerAttendance_withNonAbsentStatus_neverTouchesOutbox() {
         when(repositoryPort.save(any(AttendanceEvent.class))).thenAnswer(inv -> inv.getArgument(0));
 
         attendanceService.registerAttendance(studentId, schoolId, LocalDate.now(), "LATE", teacherId, 1L);
         attendanceService.registerAttendance(studentId, schoolId, LocalDate.now(), "JUSTIFIED", teacherId, 1L);
 
-        verifyNoInteractions(eventPublisherPort);
+        verifyNoInteractions(outboxPort, lamportClockPort);
     }
 
     @Test
@@ -100,7 +106,7 @@ class AttendanceServiceTest {
             studentId, schoolId, futureDate, "PRESENT", teacherId, 1L))
             .isInstanceOf(InvalidAttendanceDateException.class);
 
-        verifyNoInteractions(repositoryPort, eventPublisherPort);
+        verifyNoInteractions(repositoryPort, outboxPort, lamportClockPort);
     }
 
     @Test
@@ -119,7 +125,7 @@ class AttendanceServiceTest {
             studentId, schoolId, LocalDate.now(), "ON_VACATION", teacherId, 1L))
             .isInstanceOf(InvalidAttendanceException.class);
 
-        verifyNoInteractions(repositoryPort, eventPublisherPort);
+        verifyNoInteractions(repositoryPort, outboxPort, lamportClockPort);
     }
 
     @Test

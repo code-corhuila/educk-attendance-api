@@ -46,15 +46,18 @@ public class StudentAbsentEvent {
         private String teacherId;
         private String teacherName;
         private Long sequenceNum;
+        // Lamport logical timestamp: lets consumers order events causally (ADR-007).
+        private Long lamportTimestamp; 
         private LocalDateTime recordedAt;
 
-        public StudentAbsentPayload(String attendanceId, String studentId, String schoolId, LocalDate date, String status, Long sequenceNum) {
+        public StudentAbsentPayload(String attendanceId, String studentId, String schoolId, LocalDate date, String status, Long sequenceNum, Long lamportTimestamp) {
             this.attendanceId = attendanceId;
             this.studentId = studentId;
             this.schoolId = schoolId;
             this.date = date;
             this.status = status;
             this.sequenceNum = sequenceNum;
+            this.lamportTimestamp = lamportTimestamp;
             this.recordedAt = LocalDateTime.now();
         }
 
@@ -72,6 +75,7 @@ public class StudentAbsentEvent {
         public String getTeacherName() { return teacherName; }
         public void setTeacherName(String teacherName) { this.teacherName = teacherName; }
         public Long getSequenceNum() { return sequenceNum; }
+        public Long getLamportTimestamp() { return lamportTimestamp; }
         public LocalDateTime getRecordedAt() { return recordedAt; }
     }
 }

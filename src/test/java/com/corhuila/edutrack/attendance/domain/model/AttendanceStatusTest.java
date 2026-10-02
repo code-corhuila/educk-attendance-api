@@ -23,12 +23,10 @@ class AttendanceStatusTest {
     }
 
     @Test
-    void fromString_rejectsValueOutsideDomainEnum() {
-        // TARDY/EXCUSED eran los valores antiguos: ya no son válidos.
-        assertThatThrownBy(() -> AttendanceStatus.fromString("TARDY"))
-            .isInstanceOf(InvalidAttendanceException.class);
-        assertThatThrownBy(() -> AttendanceStatus.fromString("EXCUSED"))
-            .isInstanceOf(InvalidAttendanceException.class);
+    void fromString_acceptsLegacyValues() {
+        // TARDY and EXCUSED are legacy values mapped to LATE and JUSTIFIED for backward compatibility.
+        assertThat(AttendanceStatus.fromString("TARDY")).isEqualTo(AttendanceStatus.LATE);
+        assertThat(AttendanceStatus.fromString("EXCUSED")).isEqualTo(AttendanceStatus.JUSTIFIED);
     }
 
     @Test

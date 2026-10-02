@@ -1,6 +1,9 @@
 package com.corhuila.edutrack.attendance.domain.exception;
 
-public class InvalidAttendanceException extends RuntimeException {
+/**
+ * Thrown when an attendance status is invalid.
+ */
+public class InvalidAttendanceException extends AttendanceDomainException {
     public InvalidAttendanceException(String message) {
         super(message);
     }

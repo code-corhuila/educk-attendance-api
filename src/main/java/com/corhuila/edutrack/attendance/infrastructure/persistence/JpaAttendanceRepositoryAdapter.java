@@ -26,7 +26,7 @@ public class JpaAttendanceRepositoryAdapter implements AttendanceRepositoryPort 
             event.getStudentId(),
             event.getSchoolId(),
             event.getDate(),
-            event.getStatus().name(), // enum de dominio -> columna String en BD
+            event.getStatus().name(), // domain enum -> String column in DB
             event.getTeacherId(),
             event.getSequenceNum(),
             event.getRecordedAt()
@@ -60,7 +60,7 @@ public class JpaAttendanceRepositoryAdapter implements AttendanceRepositoryPort 
             entity.getStudentId(),
             entity.getSchoolId(),
             entity.getDate(),
-            AttendanceStatus.fromString(entity.getStatus()), // columna String en BD -> enum de dominio
+            AttendanceStatus.fromString(entity.getStatus()), // String column in DB -> domain enum
             entity.getTeacherId(),
             entity.getSequenceNum(),
             entity.getRecordedAt()

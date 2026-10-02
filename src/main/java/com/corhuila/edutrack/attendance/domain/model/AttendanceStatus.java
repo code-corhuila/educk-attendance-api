@@ -5,9 +5,9 @@ import com.corhuila.edutrack.attendance.domain.exception.InvalidAttendanceExcept
 import java.util.Locale;
 
 /**
- * Enum de dominio que restringe los estados válidos de un registro de asistencia.
- * Es el único punto de verdad sobre qué estados existen (invariante de dominio),
- * evitando el "primitive obsession" de manejar el estado como String suelto.
+ * Domain enum that restricts the valid states of an attendance record.
+ * It is the single source of truth for existing states (domain invariant),
+ * preventing primitive obsession by avoiding the use of raw Strings.
  */
 public enum AttendanceStatus {
     PRESENT,
@@ -16,25 +16,36 @@ public enum AttendanceStatus {
     JUSTIFIED;
 
     /**
-     * Convierte un valor crudo (proveniente de HTTP, BD, mensajería, etc.) en un
-     * AttendanceStatus válido del dominio.
+     * Converts a raw string value (from HTTP, DB, messaging, etc.) into a
+     * valid domain AttendanceStatus.
+     * Maps legacy values (TARDY -> LATE, EXCUSED -> JUSTIFIED) to preserve
+     * read-path compatibility for existing records in the database.
      *
-     * @param rawStatus valor recibido desde un puerto de entrada/adaptador
-     * @return el AttendanceStatus correspondiente
-     * @throws InvalidAttendanceException si rawStatus es nulo, vacío o no coincide
-     *                                     con PRESENT, ABSENT, LATE o JUSTIFIED
+     * @param rawStatus value received from an input port/adapter
+     * @return the corresponding AttendanceStatus
+     * @throws InvalidAttendanceException if rawStatus is null, blank, or invalid
      */
     public static AttendanceStatus fromString(String rawStatus) {
         if (rawStatus == null || rawStatus.isBlank()) {
             throw new InvalidAttendanceException(
-                "El estado de asistencia no puede ser nulo ni vacío. Valores permitidos: "
-                    + allowedValues());
+                "Attendance status cannot be null or empty. Allowed values: " + allowedValues());
         }
+        
+        String normalized = rawStatus.trim().toUpperCase(Locale.ROOT);
+        
+        // Handle legacy status values for backward compatibility
+        if ("TARDY".equals(normalized)) {
+            return LATE;
+        }
+        if ("EXCUSED".equals(normalized)) {
+            return JUSTIFIED;
+        }
+
         try {
-            return AttendanceStatus.valueOf(rawStatus.trim().toUpperCase(Locale.ROOT));
+            return AttendanceStatus.valueOf(normalized);
         } catch (IllegalArgumentException notAValidEnumConstant) {
             throw new InvalidAttendanceException(
-                "Estado inválido: " + rawStatus + ". Valores permitidos: " + allowedValues());
+                "Invalid status: " + rawStatus + ". Allowed values: " + allowedValues());
         }
     }
 

@@ -28,9 +28,9 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
- * Pruebas unitarias de AttendanceService. No se levanta contexto de Spring:
- * la clase se instancia directamente con dependencias mockeadas, lo que
- * confirma que la capa de aplicación no está acoplada a frameworks.
+ * Unit tests for AttendanceService. No Spring context is loaded:
+ * the class is instantiated directly with mocked dependencies, which
+ * confirms the application layer is not coupled to frameworks.
  */
 @ExtendWith(MockitoExtension.class)
 class AttendanceServiceTest {

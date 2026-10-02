@@ -1,6 +1,5 @@
 package com.corhuila.edutrack.attendance.application.service;
 
-import com.corhuila.edutrack.attendance.domain.exception.InvalidAttendanceDateException;
 import com.corhuila.edutrack.attendance.domain.model.AttendanceEvent;
 import com.corhuila.edutrack.attendance.domain.model.AttendanceStatus;
 import com.corhuila.edutrack.attendance.domain.model.StudentAbsentEvent;
@@ -8,34 +7,34 @@ import com.corhuila.edutrack.attendance.domain.port.in.GetAttendanceUseCase;
 import com.corhuila.edutrack.attendance.domain.port.in.RegisterAttendanceUseCase;
 import com.corhuila.edutrack.attendance.domain.port.out.AttendanceEventPublisherPort;
 import com.corhuila.edutrack.attendance.domain.port.out.AttendanceRepositoryPort;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
 /**
- * Servicio de aplicación (capa application/service) que orquesta el registro
- * y la consulta de asistencia.
+ * Application service that orchestrates attendance registration and retrieval.
  *
- * Regla arquitectónica (Hexagonal / Ports & Adapters): esta clase SOLO depende
- * de tipos de dominio y de puertos de salida (interfaces). No conoce JPA,
- * RabbitMQ ni Spring MVC; las anotaciones @Service/@Transactional son el único
- * acoplamiento a Spring y sirven exclusivamente para el ensamblado del bean y
- * la demarcación transaccional, no para la lógica de negocio en sí.
+ * Architectural Rule (Hexagonal / Ports & Adapters): This class ONLY depends
+ * on domain types and output ports (interfaces). It knows nothing about JPA,
+ * RabbitMQ, or Spring MVC. The @Service/@Transactional annotations are the
+ * only Spring coupling, strictly for bean assembly and transaction boundaries,
+ * not for business logic.
  *
  * SOLID:
- * - SRP: únicamente orquesta el caso de uso de asistencia (valida invariants,
- *   delega persistencia y publicación de eventos a sus puertos).
- * - DIP: depende de abstracciones (AttendanceRepositoryPort,
- *   AttendanceEventPublisherPort), no de implementaciones concretas.
- * - Inyección por constructor (sin @Autowired en campos) para poder
- *   instanciar la clase en pruebas unitarias con mocks, sin contexto Spring.
+ * - SRP: Only orchestrates the attendance use case (delegates invariants to domain,
+ *   persistence and event publishing to its ports).
+ * - DIP: Depends on abstractions (AttendanceRepositoryPort, AttendanceEventPublisherPort).
+ * - Constructor Injection: Allows testing with mocks without Spring context.
  */
 @Service
 public class AttendanceService implements RegisterAttendanceUseCase, GetAttendanceUseCase {
+
+    private static final Logger log = LoggerFactory.getLogger(AttendanceService.class);
 
     private final AttendanceRepositoryPort repositoryPort;
     private final AttendanceEventPublisherPort eventPublisherPort;
@@ -48,28 +47,26 @@ public class AttendanceService implements RegisterAttendanceUseCase, GetAttendan
     @Override
     @Transactional
     public AttendanceEvent registerAttendance(UUID studentId, UUID schoolId, LocalDate date, String status, UUID teacherId, Long sequenceNum) {
-        LocalDate sessionDate = resolveSessionDate(date);
-        validateSessionDateIsNotFuture(sessionDate);
-
-        // Invariante de dominio: el estado debe pertenecer a AttendanceStatus
-        // (PRESENT, ABSENT, LATE, JUSTIFIED). Lanza InvalidAttendanceException si no.
+        // Domain invariant: The status must belong to AttendanceStatus (PRESENT, ABSENT, LATE, JUSTIFIED).
         AttendanceStatus attendanceStatus = AttendanceStatus.fromString(status);
 
-        AttendanceEvent event = new AttendanceEvent(
+        // Domain invariant: Date cannot be future. Handled by the entity's static factory.
+        AttendanceEvent event = AttendanceEvent.register(
             UUID.randomUUID(),
             studentId,
             schoolId,
-            sessionDate,
+            date,
             attendanceStatus,
             teacherId,
-            sequenceNum != null ? sequenceNum : 1L,
-            LocalDateTime.now()
+            sequenceNum
         );
 
         AttendanceEvent saved = repositoryPort.save(event);
 
-        // HU-005: si el estado registrado es ABSENT, se publica el evento de
-        // dominio StudentAbsent hacia RabbitMQ a través del puerto de salida.
+        // HU-005: If the registered status is ABSENT, publish the domain event
+        // StudentAbsent to the output port.
+        // NOTE: According to ADR-007, dual-writes should be prevented using Transactional Outbox.
+        // If the publisher port throws an exception, the @Transactional boundary will rollback the DB save.
         if (saved.getStatus() == AttendanceStatus.ABSENT) {
             publishStudentAbsentEvent(saved);
         }
@@ -89,20 +86,9 @@ public class AttendanceService implements RegisterAttendanceUseCase, GetAttendan
         return repositoryPort.findAll();
     }
 
-    // Si no se envía fecha, se asume el día de hoy (nunca puede resultar futura).
-    private LocalDate resolveSessionDate(LocalDate date) {
-        return date != null ? date : LocalDate.now();
-    }
-
-    // Invariante de dominio: no se puede registrar asistencia de una fecha futura.
-    private void validateSessionDateIsNotFuture(LocalDate sessionDate) {
-        if (sessionDate.isAfter(LocalDate.now())) {
-            throw new InvalidAttendanceDateException(
-                "La fecha de asistencia no puede ser futura: " + sessionDate);
-        }
-    }
-
-    // Construye y publica el evento de dominio StudentAbsent a través del puerto de salida.
+    /**
+     * Builds and publishes the StudentAbsent domain event through the output port.
+     */
     private void publishStudentAbsentEvent(AttendanceEvent saved) {
         StudentAbsentEvent.StudentAbsentPayload payload = new StudentAbsentEvent.StudentAbsentPayload(
             saved.getId().toString(),
@@ -113,7 +99,12 @@ public class AttendanceService implements RegisterAttendanceUseCase, GetAttendan
             saved.getSequenceNum()
         );
         StudentAbsentEvent domainEvent = new StudentAbsentEvent(saved.getId().toString(), payload);
-        eventPublisherPort.publishStudentAbsent(domainEvent);
+        
+        try {
+            eventPublisherPort.publishStudentAbsent(domainEvent);
+        } catch (Exception e) {
+            log.error("Failed to publish StudentAbsent event, transaction will be rolled back: {}", e.getMessage());
+            throw new IllegalStateException("Failed to publish attendance event", e);
+        }
     }
-    // Added comment for PR validation flow
 }

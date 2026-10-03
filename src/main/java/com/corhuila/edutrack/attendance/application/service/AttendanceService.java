@@ -1,20 +1,20 @@
 package com.corhuila.edutrack.attendance.application.service;
 
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.corhuila.edutrack.attendance.domain.model.AttendanceEvent;
 import com.corhuila.edutrack.attendance.domain.model.AttendanceStatus;
 import com.corhuila.edutrack.attendance.domain.model.StudentAbsentEvent;
 import com.corhuila.edutrack.attendance.domain.port.in.GetAttendanceUseCase;
 import com.corhuila.edutrack.attendance.domain.port.in.RegisterAttendanceUseCase;
-import com.corhuila.edutrack.attendance.domain.port.out.AttendanceEventPublisherPort;
+import com.corhuila.edutrack.attendance.domain.port.out.AttendanceOutboxPort;
 import com.corhuila.edutrack.attendance.domain.port.out.AttendanceRepositoryPort;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDate;
-import java.util.List;
-import java.util.UUID;
+import com.corhuila.edutrack.attendance.domain.port.out.LamportClockPort;
 
 /**
  * Application service that orchestrates attendance registration and retrieval.
@@ -28,20 +28,21 @@ import java.util.UUID;
  * SOLID:
  * - SRP: Only orchestrates the attendance use case (delegates invariants to domain,
  *   persistence and event publishing to its ports).
- * - DIP: Depends on abstractions (AttendanceRepositoryPort, AttendanceEventPublisherPort).
+ * - DIP: Depends on abstractions (repository, outbox and Lamport clock ports).
  * - Constructor Injection: Allows testing with mocks without Spring context.
  */
 @Service
 public class AttendanceService implements RegisterAttendanceUseCase, GetAttendanceUseCase {
 
-    private static final Logger log = LoggerFactory.getLogger(AttendanceService.class);
-
     private final AttendanceRepositoryPort repositoryPort;
-    private final AttendanceEventPublisherPort eventPublisherPort;
+    private final AttendanceOutboxPort outboxPort;
+    private final LamportClockPort lamportClockPort;
 
-    public AttendanceService(AttendanceRepositoryPort repositoryPort, AttendanceEventPublisherPort eventPublisherPort) {
+    public AttendanceService(AttendanceRepositoryPort repositoryPort, AttendanceOutboxPort outboxPort,
+                             LamportClockPort lamportClockPort) {
         this.repositoryPort = repositoryPort;
-        this.eventPublisherPort = eventPublisherPort;
+        this.outboxPort = outboxPort;
+        this.lamportClockPort = lamportClockPort;
     }
 
     @Override
@@ -63,12 +64,10 @@ public class AttendanceService implements RegisterAttendanceUseCase, GetAttendan
 
         AttendanceEvent saved = repositoryPort.save(event);
 
-        // HU-005: If the registered status is ABSENT, publish the domain event
-        // StudentAbsent to the output port.
-        // NOTE: According to ADR-007, dual-writes should be prevented using Transactional Outbox.
-        // If the publisher port throws an exception, the @Transactional boundary will rollback the DB save.
+        // HU-005 + ADR-007: ABSENT records a StudentAbsent event in the outbox.
+        // If the outbox write fails, the @Transactional boundary also rolls back the attendance save.
         if (saved.getStatus() == AttendanceStatus.ABSENT) {
-            publishStudentAbsentEvent(saved);
+            recordStudentAbsentInOutbox(saved);
         }
 
         return saved;
@@ -87,24 +86,21 @@ public class AttendanceService implements RegisterAttendanceUseCase, GetAttendan
     }
 
     /**
-     * Builds and publishes the StudentAbsent domain event through the output port.
+     * Stamps the StudentAbsent event with a Lamport timestamp and appends it to the outbox.
      */
-    private void publishStudentAbsentEvent(AttendanceEvent saved) {
+    private void recordStudentAbsentInOutbox(AttendanceEvent saved) {
+        long lamportTimestamp = lamportClockPort.tick(saved.getSequenceNum());
         StudentAbsentEvent.StudentAbsentPayload payload = new StudentAbsentEvent.StudentAbsentPayload(
             saved.getId().toString(),
             saved.getStudentId().toString(),
             saved.getSchoolId() != null ? saved.getSchoolId().toString() : "school-default",
             saved.getDate(),
             saved.getStatus().name(),
-            saved.getSequenceNum()
+            saved.getSequenceNum(),
+            lamportTimestamp
         );
         StudentAbsentEvent domainEvent = new StudentAbsentEvent(saved.getId().toString(), payload);
-        
-        try {
-            eventPublisherPort.publishStudentAbsent(domainEvent);
-        } catch (Exception e) {
-            log.error("Failed to publish StudentAbsent event, transaction will be rolled back: {}", e.getMessage());
-            throw new IllegalStateException("Failed to publish attendance event", e);
-        }
+
+        outboxPort.append(domainEvent); // same ACID transaction, no broker call (ADR-007)
     }
 }

@@ -1,0 +1,23 @@
+services:
+  attendance-api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    environment:
+      DB_HOST: postgres
+      DB_PORT: '5432'
+      DB_NAME: ${PG_DATABASE:?Set PG_DATABASE}
+      DB_USER: attendance_app
+      DB_PASSWORD: ${ATTENDANCE_APP_PASSWORD:?Set ATTENDANCE_APP_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET}
+    depends_on:
+      attendance-db-migrate:
+        condition: service_completed_successfully
+    networks:
+      platform:
+        aliases: [educk-attendance-api]
+    healthcheck:
+      test: [CMD-SHELL, 'wget -q -O /dev/null http://127.0.0.1:8083/api/v1/attendance/health']
+      interval: 10s
+      timeout: 5s
+      retries: 30

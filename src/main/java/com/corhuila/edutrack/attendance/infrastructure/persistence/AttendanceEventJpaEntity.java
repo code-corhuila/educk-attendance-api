@@ -30,8 +30,16 @@ public class AttendanceEventJpaEntity {
     @Column(name = "sequence_num", nullable = false)
     private Long sequenceNum;
 
-    @Column(name = "recorded_at", nullable = false)
+    @Column(name = "created_at", nullable = false)
     private LocalDateTime recordedAt;
+
+    @Column(name = "idempotency_key", nullable = false, unique = true)
+    private String idempotencyKey;
+
+    @PrePersist
+    void assignPersistenceKey() {
+        if (idempotencyKey == null) idempotencyKey = id.toString();
+    }
 
     public AttendanceEventJpaEntity() {}
 

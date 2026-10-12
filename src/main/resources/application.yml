@@ -6,8 +6,8 @@ spring:
     name: attendance-service
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:attendance_db}
-    username: ${DB_USER:postgres}
-    password: ${DB_PASSWORD:postgres}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
@@ -17,3 +17,6 @@ spring:
     port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USER:guest}
     password: ${RABBITMQ_PASSWORD:guest}
+
+jwt:
+  secret: ${JWT_SECRET}

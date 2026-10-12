@@ -1,0 +1,27 @@
+name: attendance persistence tests
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: api
+      - uses: actions/checkout@v4
+        with:
+          repository: code-corhuila/educk-attendance-db
+          ref: 16c9718c2f732336ccebfae99b7abb0df2ea3594
+          path: database
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: api/pom.xml
+      - name: Verify against owning database
+        working-directory: api
+        run: mvn -B verify -Dapi.version=1.44 -Dattendance.db.path="$GITHUB_WORKSPACE/database"

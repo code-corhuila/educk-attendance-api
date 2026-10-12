@@ -29,6 +29,7 @@ public class AttendanceOutboxEntity {
     @Column(name = "aggregate_type", nullable = false, length = 100)
     private String aggregateType;
 
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "aggregate_id", nullable = false)
     private UUID aggregateId;
 
@@ -49,7 +50,7 @@ public class AttendanceOutboxEntity {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
-    @Column(name = "processed_at")
+    @Column(name = "published_at")
     private Instant processedAt;
 
     /** Required by JPA. */

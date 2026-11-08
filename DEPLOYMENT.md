@@ -2,8 +2,8 @@
 
 Use the paired HU-005 database correction: V1 and V3 are under 01_ddl,
 and V4 adds school_id and the persisted Lamport clock and allows JUSTIFIED.
-All SQL remains in educk-attendance-db. Set DB_USER, DB_PASSWORD and JWT_SECRET;
-use the same local HMAC signing key as Identity within the selected environment.
+All SQL remains in educk-attendance-db. Set DB_USER, DB_PASSWORD and JWT_PUBLIC_KEY;
+use the RSA X.509 PEM public key (`RS256`) matching the Identity service.
 Each environment needs its own database instance and persistent volume.
 
 Run Java 21: mvn verify -Dapi.version=1.44 -Dattendance.db.path=/path/to/educk-attendance-db

@@ -28,12 +28,16 @@ public class AttendanceController {
 
     @PostMapping
     public ResponseEntity<AttendanceResponse> registerAttendance(@RequestBody RegisterAttendanceRequest request) {
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        UUID verifiedTeacherId = (auth != null && auth.getName() != null && !"anonymousUser".equals(auth.getName()))
+                ? UUID.fromString(auth.getName())
+                : request.getTeacherId();
         AttendanceEvent created = registerAttendanceUseCase.registerAttendance(
             request.getStudentId(),
             request.getSchoolId(),
             request.getDate(),
             request.getStatus(),
-            request.getTeacherId(),
+            verifiedTeacherId,
             request.getSequenceNum()
         );
         return ResponseEntity.status(HttpStatus.CREATED).body(AttendanceResponse.fromDomain(created));

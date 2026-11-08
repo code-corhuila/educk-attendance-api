@@ -35,10 +35,18 @@ class AttendanceTransactionTest {
     }
 
     @DynamicPropertySource static void properties(DynamicPropertyRegistry registry) {
+        try {
+            var kpg = java.security.KeyPairGenerator.getInstance("RSA");
+            kpg.initialize(2048);
+            var kp = kpg.generateKeyPair();
+            String pem = "-----BEGIN PUBLIC KEY-----\n"
+                    + java.util.Base64.getMimeEncoder(64, "\n".getBytes()).encodeToString(kp.getPublic().getEncoded())
+                    + "\n-----END PUBLIC KEY-----";
+            registry.add("jwt.public-key", () -> pem);
+        } catch (Exception e) { throw new IllegalStateException(e); }
         registry.add("spring.datasource.url", database::getJdbcUrl);
         registry.add("spring.datasource.username", database::getUsername);
         registry.add("spring.datasource.password", database::getPassword);
-        registry.add("jwt.secret", () -> UUID.randomUUID().toString() + UUID.randomUUID());
         registry.add("spring.rabbitmq.port", () -> 1);
     }
 

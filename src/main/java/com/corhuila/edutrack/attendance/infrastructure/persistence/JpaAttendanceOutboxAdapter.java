@@ -45,6 +45,15 @@ public class JpaAttendanceOutboxAdapter implements AttendanceOutboxPort {
         ));
     }
 
+    @Override
+    @Transactional
+    public void markProcessed(@org.springframework.lang.NonNull UUID id) {
+        repository.findById(id).ifPresent(entity -> {
+            entity.markProcessed(Instant.now());
+            repository.save(entity);
+        });
+    }
+
     private String toJson(StudentAbsentEvent.StudentAbsentPayload payload) {
         try {
             return objectMapper.writeValueAsString(payload);

@@ -10,4 +10,8 @@ public interface AttendanceOutboxPort {
 
     /** Appends the event to the outbox as PENDING (payload already carries the Lamport timestamp). */
     void append(StudentAbsentEvent event);
+
+    /** Marks an outbox row as PROCESSED once relayed. */
+    default void markProcessed(java.util.UUID id) {
+    }
 }

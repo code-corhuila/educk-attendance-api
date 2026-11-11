@@ -79,4 +79,9 @@ public class AttendanceOutboxEntity {
     public String getStatus() { return status; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getProcessedAt() { return processedAt; }
+
+    public void markProcessed(Instant timestamp) {
+        this.status = "PROCESSED";
+        this.processedAt = Objects.requireNonNull(timestamp, "timestamp must not be null");
+    }
 }

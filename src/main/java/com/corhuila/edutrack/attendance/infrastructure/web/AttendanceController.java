@@ -22,7 +22,8 @@ public class AttendanceController {
     private final GetAttendanceUseCase getAttendanceUseCase;
     private final java.util.Map<String, AttendanceResponse> idempotencyCache = new java.util.concurrent.ConcurrentHashMap<>();
 
-    public AttendanceController(RegisterAttendanceUseCase registerAttendanceUseCase, GetAttendanceUseCase getAttendanceUseCase) {
+    public AttendanceController(RegisterAttendanceUseCase registerAttendanceUseCase,
+            GetAttendanceUseCase getAttendanceUseCase) {
         this.registerAttendanceUseCase = registerAttendanceUseCase;
         this.getAttendanceUseCase = getAttendanceUseCase;
     }
@@ -42,13 +43,12 @@ public class AttendanceController {
                 ? UUID.fromString(auth.getName())
                 : request.getTeacherId();
         AttendanceEvent created = registerAttendanceUseCase.registerAttendance(
-            request.getStudentId(),
-            request.getSchoolId(),
-            request.getDate(),
-            request.getStatus(),
-            verifiedTeacherId,
-            request.getSequenceNum()
-        );
+                request.getStudentId(),
+                request.getSchoolId(),
+                request.getDate(),
+                request.getStatus(),
+                verifiedTeacherId,
+                request.getSequenceNum());
         AttendanceResponse response = AttendanceResponse.fromDomain(created);
         if (idempotencyKey != null && !idempotencyKey.isBlank() && idempotencyCache.size() < 1024) {
             idempotencyCache.putIfAbsent(idempotencyKey.trim(), response);

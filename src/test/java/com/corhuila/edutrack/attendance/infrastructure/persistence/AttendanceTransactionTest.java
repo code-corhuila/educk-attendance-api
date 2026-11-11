@@ -21,6 +21,7 @@ import static org.mockito.Mockito.doThrow;
 
 @SpringBootTest
 @Testcontainers
+@SuppressWarnings("null")
 class AttendanceTransactionTest {
     @Container static PostgreSQLContainer<?> database = new PostgreSQLContainer<>("postgres:16-alpine")
             .withPassword(UUID.randomUUID().toString())

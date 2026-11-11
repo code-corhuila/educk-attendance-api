@@ -18,6 +18,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * unit as the attendance record) and fails fast otherwise. Never touches RabbitMQ.
  */
 @Component
+@SuppressWarnings("null")
 public class JpaAttendanceOutboxAdapter implements AttendanceOutboxPort {
 
     static final String AGGREGATE_TYPE = "Attendance";
@@ -47,7 +48,10 @@ public class JpaAttendanceOutboxAdapter implements AttendanceOutboxPort {
 
     @Override
     @Transactional
-    public void markProcessed(@org.springframework.lang.NonNull UUID id) {
+    public void markProcessed(UUID id) {
+        if (id == null) {
+            return;
+        }
         repository.findById(id).ifPresent(entity -> {
             entity.markProcessed(Instant.now());
             repository.save(entity);

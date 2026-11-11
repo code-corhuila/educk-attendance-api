@@ -9,7 +9,7 @@ services:
       DB_NAME: ${PG_DATABASE:?Set PG_DATABASE}
       DB_USER: attendance_app
       DB_PASSWORD: ${ATTENDANCE_APP_PASSWORD:?Set ATTENDANCE_APP_PASSWORD}
-      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET}
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:?Set JWT_PUBLIC_KEY}
     depends_on:
       attendance-db-migrate:
         condition: service_completed_successfully

@@ -20,27 +20,40 @@ public class AttendanceController {
 
     private final RegisterAttendanceUseCase registerAttendanceUseCase;
     private final GetAttendanceUseCase getAttendanceUseCase;
+    private final java.util.Map<String, AttendanceResponse> idempotencyCache = new java.util.concurrent.ConcurrentHashMap<>();
 
-    public AttendanceController(RegisterAttendanceUseCase registerAttendanceUseCase, GetAttendanceUseCase getAttendanceUseCase) {
+    public AttendanceController(RegisterAttendanceUseCase registerAttendanceUseCase,
+            GetAttendanceUseCase getAttendanceUseCase) {
         this.registerAttendanceUseCase = registerAttendanceUseCase;
         this.getAttendanceUseCase = getAttendanceUseCase;
     }
 
     @PostMapping
-    public ResponseEntity<AttendanceResponse> registerAttendance(@RequestBody RegisterAttendanceRequest request) {
+    public ResponseEntity<AttendanceResponse> registerAttendance(
+            @RequestBody RegisterAttendanceRequest request,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            AttendanceResponse cached = idempotencyCache.get(idempotencyKey.trim());
+            if (cached != null) {
+                return ResponseEntity.status(HttpStatus.CREATED).body(cached);
+            }
+        }
         var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
         UUID verifiedTeacherId = (auth != null && auth.getName() != null && !"anonymousUser".equals(auth.getName()))
                 ? UUID.fromString(auth.getName())
                 : request.getTeacherId();
         AttendanceEvent created = registerAttendanceUseCase.registerAttendance(
-            request.getStudentId(),
-            request.getSchoolId(),
-            request.getDate(),
-            request.getStatus(),
-            verifiedTeacherId,
-            request.getSequenceNum()
-        );
-        return ResponseEntity.status(HttpStatus.CREATED).body(AttendanceResponse.fromDomain(created));
+                request.getStudentId(),
+                request.getSchoolId(),
+                request.getDate(),
+                request.getStatus(),
+                verifiedTeacherId,
+                request.getSequenceNum());
+        AttendanceResponse response = AttendanceResponse.fromDomain(created);
+        if (idempotencyKey != null && !idempotencyKey.isBlank() && idempotencyCache.size() < 1024) {
+            idempotencyCache.putIfAbsent(idempotencyKey.trim(), response);
+        }
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @GetMapping("/student/{studentId}")

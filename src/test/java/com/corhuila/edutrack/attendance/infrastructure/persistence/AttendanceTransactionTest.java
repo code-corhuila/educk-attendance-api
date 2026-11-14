@@ -21,20 +21,26 @@ import static org.mockito.Mockito.doThrow;
 
 @SpringBootTest
 @Testcontainers
+@SuppressWarnings("null")
 class AttendanceTransactionTest {
-    @Container static PostgreSQLContainer<?> database = new PostgreSQLContainer<>("postgres:16-alpine")
+    @Container
+    static PostgreSQLContainer<?> database = new PostgreSQLContainer<>("postgres:16-alpine")
             .withPassword(UUID.randomUUID().toString())
             .withCopyFileToContainer(script("01_ddl/V1__init_attendance.sql"), "/docker-entrypoint-initdb.d/01.sql")
-            .withCopyFileToContainer(script("01_ddl/V3__outbox_events_schema.sql"), "/docker-entrypoint-initdb.d/03.sql")
-            .withCopyFileToContainer(script("04_alter/V4__align_attendance_runtime.sql"), "/docker-entrypoint-initdb.d/04.sql");
+            .withCopyFileToContainer(script("01_ddl/V3__outbox_events_schema.sql"),
+                    "/docker-entrypoint-initdb.d/03.sql")
+            .withCopyFileToContainer(script("04_alter/V4__align_attendance_runtime.sql"),
+                    "/docker-entrypoint-initdb.d/04.sql");
 
     static MountableFile script(String file) {
         String root = System.getProperty("attendance.db.path");
-        if (root == null) throw new IllegalStateException("Set -Dattendance.db.path to educk-attendance-db");
+        if (root == null)
+            throw new IllegalStateException("Set -Dattendance.db.path to educk-attendance-db");
         return MountableFile.forHostPath(Path.of(root, file));
     }
 
-    @DynamicPropertySource static void properties(DynamicPropertyRegistry registry) {
+    @DynamicPropertySource
+    static void properties(DynamicPropertyRegistry registry) {
         try {
             var kpg = java.security.KeyPairGenerator.getInstance("RSA");
             kpg.initialize(2048);
@@ -43,22 +49,29 @@ class AttendanceTransactionTest {
                     + java.util.Base64.getMimeEncoder(64, "\n".getBytes()).encodeToString(kp.getPublic().getEncoded())
                     + "\n-----END PUBLIC KEY-----";
             registry.add("jwt.public-key", () -> pem);
-        } catch (Exception e) { throw new IllegalStateException(e); }
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
         registry.add("spring.datasource.url", database::getJdbcUrl);
         registry.add("spring.datasource.username", database::getUsername);
         registry.add("spring.datasource.password", database::getPassword);
         registry.add("spring.rabbitmq.port", () -> 1);
     }
 
-    @Autowired AttendanceService service;
-    @Autowired JdbcTemplate jdbc;
-    @SpyBean JpaAttendanceOutboxAdapter outbox;
+    @Autowired
+    AttendanceService service;
+    @Autowired
+    JdbcTemplate jdbc;
+    @SpyBean
+    JpaAttendanceOutboxAdapter outbox;
 
-    @Test void persistsWithoutBrokerAndRollsBackWhenOutboxFails() {
+    @Test
+    void persistsWithoutBrokerAndRollsBackWhenOutboxFails() {
         UUID student = UUID.randomUUID(), school = UUID.randomUUID(), teacher = UUID.randomUUID();
         service.registerAttendance(student, school, LocalDate.now(), "ABSENT", teacher, 3L);
         assertEquals(1, service.getAttendanceByStudent(student).size());
-        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM outbox_events WHERE status = 'PENDING'", Integer.class));
+        assertEquals(1,
+                jdbc.queryForObject("SELECT COUNT(*) FROM outbox_events WHERE status = 'PENDING'", Integer.class));
         assertEquals(4L, jdbc.queryForObject("SELECT MAX(lamport_timestamp) FROM outbox_events", Long.class));
 
         service.registerAttendance(student, school, LocalDate.now(), "JUSTIFIED", teacher, 4L);

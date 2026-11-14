@@ -19,6 +19,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 /** Unit tests for outbox insertion: repository mocked, real ObjectMapper, no Spring context. */
 @ExtendWith(MockitoExtension.class)
+@SuppressWarnings("null")
 class JpaAttendanceOutboxAdapterTest {
 
     @Mock
